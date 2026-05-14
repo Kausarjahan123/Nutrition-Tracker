@@ -147,7 +147,11 @@ if food_query:
             carbs = get_nutrient(nutrients, "Carbohydrate, by difference")
             fats = get_nutrient(nutrients, "Total lipid (fat)")
             fiber = get_nutrient(nutrients, "Fiber, total dietary")
-            sugar = get_nutrient(nutrients, "Sugars, total including NLEA")
+            sugar = (
+    get_nutrient(nutrients, "Sugars, total including NLEA")
+    or get_nutrient(nutrients, "Total Sugars")
+    or 0
+)
 
             # scaling
             def scale(x): return (x * grams) / 100
