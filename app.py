@@ -5,75 +5,318 @@ st.set_page_config(page_title="AI Nutrition Tracker", layout="centered")
 
 # ---------------- UI ---------------- #
 st.title("🥗 AI Nutrition Tracker")
-
-st.write("Enter a food item and grams to get nutrition facts.")
-
-# ---------------- INPUTS ---------------- #
-food_name = st.text_input("🍗 Food Name")
-
-grams = st.number_input("⚖️ Grams", min_value=1, value=100)
+st.write("Search foods from USDA database with accurate nutrition facts.")
 
 # ---------------- USDA API ---------------- #
-API_KEY = "P73wIVJPiCNTOFtegbe97NOAyX8cCif4fDzCwk07"
+API_KEY = "YOUR_USDA_API_KEY"
 
-def get_food_data(food):
-    search_url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+# ---------------- SEARCH FUNCTION ---------------- #
+def search_food(food_name):
+
+    url = "https://api.nal.usda.gov/fdc/v1/foods/search"
 
     params = {
         "api_key": API_KEY,
-        "query": food,
-        "pageSize": 1
+        "query": food_name,
+        "pageSize": 10
     }
 
-    response = requests.get(search_url, params=params)
+    response = requests.get(url, params=params)
     data = response.json()
 
-    if "foods" in data and len(data["foods"]) > 0:
-        return data["foods"][0]
+    if "foods" in data:
+        return data["foods"]
 
-    return None
+    return []
 
-# ---------------- BUTTON ---------------- #
-if st.button("Get Nutrition Facts"):
+# ---------------- USER INPUT ---------------- #
+food_query = st.text_input("🍗 Search Food")
 
-    food_data = get_food_data(food_name)
+grams = st.number_input("⚖️ Enter grams", min_value=1, value=100)
 
-    if food_data:
+# ---------------- SEARCH RESULTS ---------------- #
+if food_query:
 
-        nutrients = food_data.get("foodNutrients", [])
+    foods = search_food(food_query)
 
-        protein = carbs = fats = calories = 0
+    if foods:
 
-        for nutrient in nutrients:
+        # create dropdown options
+        food_options = {}
 
-            name = nutrient.get("nutrientName", "")
+        for food in foods:
 
-            value = nutrient.get("value", 0)
+            description = food.get("description", "Unknown Food")
 
-            # per 100g adjustment
-            adjusted = (value * grams) / 100
+            brand = food.get("brandOwner", "")
 
-            if name == "Protein":
-                protein = adjusted
+            label = f"{description} ({brand})" if brand else description
 
-            elif name == "Carbohydrate, by difference":
-                carbs = adjusted
+            food_options[label] = food
 
-            elif name == "Total lipid (fat)":
-                fats = adjusted
+        selected_label = st.selectbox(
+            "Select exact food item",
+            list(food_options.keys())
+        )
 
-            elif name == "Energy":
-                calories = adjusted
+        selected_food = food_options[selected_label]
 
-        # ---------------- RESULTS ---------------- #
-        st.markdown("---")
+        # ---------------- BUTTON ---------------- #
+        if st.button("Get Accurate Nutrition"):
 
-        st.subheader(f"Nutrition Facts for {grams}g of {food_name}")
+            nutrients = selected_food.get("foodNutrients", [])
 
-        st.metric("🔥 Calories", f"{calories:.2f} kcal")
-        st.metric("💪 Protein", f"{protein:.2f} g")
-        st.metric("🍞 Carbs", f"{carbs:.2f} g")
-        st.metric("🥑 Fats", f"{fats:.2f} g")
+            protein = carbs = fats = calories = 0
+
+            for nutrient in nutrients:
+
+                name = nutrient.get("nutrientName", "")
+
+                value = nutrient.get("value", 0)
+
+                adjusted_value = (value * grams) / 100
+
+                # Protein
+                if name == "Protein":
+                    protein = adjusted_value
+
+                # Carbs
+                elif name == "Carbohydrate, by difference":
+                    carbs = adjusted_value
+
+                # Fats
+                elif name == "Total lipid (fat)":
+                    fats = adjusted_value
+
+                # Calories
+                elif name == "Energy":
+                    calories = adjusted_value
+
+            # ---------------- RESULTS ---------------- #
+            st.markdown("---")
+
+            st.subheader(f"Nutrition Facts for {grams}g")
+
+            st.success(selected_label)
+
+            st.metric("🔥 Calories", f"{calories:.2f} kcal")
+            st.metric("💪 Protein", f"{protein:.2f} g")
+            st.metric("🍞 Carbs", f"{carbs:.2f} g")
+            st.metric("🥑 Fats", f"{fats:.2f} g")
 
     else:
-        st.error("Food not found.")
+        st.error("No foods found.")import streamlit as st
+import requests
+
+st.set_page_config(page_title="AI Nutrition Tracker", layout="centered")
+
+# ---------------- UI ---------------- #
+st.title("🥗 AI Nutrition Tracker")
+st.write("Search foods from USDA database with accurate nutrition facts.")
+
+# ---------------- USDA API ---------------- #
+API_KEY = "YOUR_USDA_API_KEY"
+
+# ---------------- SEARCH FUNCTION ---------------- #
+def search_food(food_name):
+
+    url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+
+    params = {
+        "api_key": API_KEY,
+        "query": food_name,
+        "pageSize": 10
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    if "foods" in data:
+        return data["foods"]
+
+    return []
+
+# ---------------- USER INPUT ---------------- #
+food_query = st.text_input("🍗 Search Food")
+
+grams = st.number_input("⚖️ Enter grams", min_value=1, value=100)
+
+# ---------------- SEARCH RESULTS ---------------- #
+if food_query:
+
+    foods = search_food(food_query)
+
+    if foods:
+
+        # create dropdown options
+        food_options = {}
+
+        for food in foods:
+
+            description = food.get("description", "Unknown Food")
+
+            brand = food.get("brandOwner", "")
+
+            label = f"{description} ({brand})" if brand else description
+
+            food_options[label] = food
+
+        selected_label = st.selectbox(
+            "Select exact food item",
+            list(food_options.keys())
+        )
+
+        selected_food = food_options[selected_label]
+
+        # ---------------- BUTTON ---------------- #
+        if st.button("Get Accurate Nutrition"):
+
+            nutrients = selected_food.get("foodNutrients", [])
+
+            protein = carbs = fats = calories = 0
+
+            for nutrient in nutrients:
+
+                name = nutrient.get("nutrientName", "")
+
+                value = nutrient.get("value", 0)
+
+                adjusted_value = (value * grams) / 100
+
+                # Protein
+                if name == "Protein":
+                    protein = adjusted_value
+
+                # Carbs
+                elif name == "Carbohydrate, by difference":
+                    carbs = adjusted_value
+
+                # Fats
+                elif name == "Total lipid (fat)":
+                    fats = adjusted_value
+
+                # Calories
+                elif name == "Energy":
+                    calories = adjusted_value
+
+            # ---------------- RESULTS ---------------- #
+            st.markdown("---")
+
+            st.subheader(f"Nutrition Facts for {grams}g")
+
+            st.success(selected_label)
+
+            st.metric("🔥 Calories", f"{calories:.2f} kcal")
+            st.metric("💪 Protein", f"{protein:.2f} g")
+            st.metric("🍞 Carbs", f"{carbs:.2f} g")
+            st.metric("🥑 Fats", f"{fats:.2f} g")
+
+    else:
+        st.error("No foods found.")import streamlit as st
+import requests
+
+st.set_page_config(page_title="AI Nutrition Tracker", layout="centered")
+
+# ---------------- UI ---------------- #
+st.title("🥗 AI Nutrition Tracker")
+st.write("Search foods from USDA database with accurate nutrition facts.")
+
+# ---------------- USDA API ---------------- #
+API_KEY = "YOUR_USDA_API_KEY"
+
+# ---------------- SEARCH FUNCTION ---------------- #
+def search_food(food_name):
+
+    url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+
+    params = {
+        "api_key": API_KEY,
+        "query": food_name,
+        "pageSize": 10
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    if "foods" in data:
+        return data["foods"]
+
+    return []
+
+# ---------------- USER INPUT ---------------- #
+food_query = st.text_input("🍗 Search Food")
+
+grams = st.number_input("⚖️ Enter grams", min_value=1, value=100)
+
+# ---------------- SEARCH RESULTS ---------------- #
+if food_query:
+
+    foods = search_food(food_query)
+
+    if foods:
+
+        # create dropdown options
+        food_options = {}
+
+        for food in foods:
+
+            description = food.get("description", "Unknown Food")
+
+            brand = food.get("brandOwner", "")
+
+            label = f"{description} ({brand})" if brand else description
+
+            food_options[label] = food
+
+        selected_label = st.selectbox(
+            "Select exact food item",
+            list(food_options.keys())
+        )
+
+        selected_food = food_options[selected_label]
+
+        # ---------------- BUTTON ---------------- #
+        if st.button("Get Accurate Nutrition"):
+
+            nutrients = selected_food.get("foodNutrients", [])
+
+            protein = carbs = fats = calories = 0
+
+            for nutrient in nutrients:
+
+                name = nutrient.get("nutrientName", "")
+
+                value = nutrient.get("value", 0)
+
+                adjusted_value = (value * grams) / 100
+
+                # Protein
+                if name == "Protein":
+                    protein = adjusted_value
+
+                # Carbs
+                elif name == "Carbohydrate, by difference":
+                    carbs = adjusted_value
+
+                # Fats
+                elif name == "Total lipid (fat)":
+                    fats = adjusted_value
+
+                # Calories
+                elif name == "Energy":
+                    calories = adjusted_value
+
+            # ---------------- RESULTS ---------------- #
+            st.markdown("---")
+
+            st.subheader(f"Nutrition Facts for {grams}g")
+
+            st.success(selected_label)
+
+            st.metric("🔥 Calories", f"{calories:.2f} kcal")
+            st.metric("💪 Protein", f"{protein:.2f} g")
+            st.metric("🍞 Carbs", f"{carbs:.2f} g")
+            st.metric("🥑 Fats", f"{fats:.2f} g")
+
+    else:
+        st.error("No foods found.")
