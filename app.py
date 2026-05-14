@@ -67,7 +67,7 @@ st.title("🥗 AI Nutrition Tracker")
 st.write("Search foods from USDA database and get accurate nutrition facts.")
 
 # ---------------- USDA API ---------------- #
-API_KEY = "YOUR_USDA_API_KEY"
+API_KEY = "P73wIVJPiCNTOFtegbe97NOAyX8cCif4fDzCwk07"
 
 # ---------------- SEARCH FUNCTION ---------------- #
 def search_food(food_name):
