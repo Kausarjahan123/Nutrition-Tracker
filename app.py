@@ -2,9 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# ---------------------------------------------------
-# PAGE CONFIG
-# ---------------------------------------------------
+# ---------------- CONFIG ---------------- #
 
 st.set_page_config(
     page_title="AI Nutrition Tracker",
@@ -12,22 +10,49 @@ st.set_page_config(
     layout="centered"
 )
 
-# ---------------------------------------------------
-# TITLE
-# ---------------------------------------------------
-
 st.title("🥗 AI Nutrition Tracker")
-st.write("Get complete nutritional facts using USDA data with intelligent food matching.")
-
-# ---------------------------------------------------
-# USDA API KEY
-# ---------------------------------------------------
+st.write("Smart USDA-based nutrition with intelligent food matching")
 
 API_KEY = "P73wIVJPiCNTOFtegbe97NOAyX8cCif4fDzCwk07"
 
-# ---------------------------------------------------
-# USDA SEARCH
-# ---------------------------------------------------
+# ---------------- SMART SCORING ---------------- #
+
+def score_food(food, query):
+
+    text = food.get("description", "").lower()
+    data_type = food.get("dataType", "")
+    category = food.get("foodCategory", "").lower()
+
+    score = 0
+    query = query.lower()
+
+    # exact match boost
+    if query in text:
+        score += 60
+
+    # word overlap
+    for word in query.split():
+        if word in text:
+            score += 10
+
+    # strong mismatch penalties
+    if "basmati" in query and "glutinous" in text:
+        score -= 100
+
+    if "rice" in query and "noodle" in text:
+        score -= 90
+
+    if "chicken" in query and "beef" in text:
+        score -= 100
+
+    # prefer clean datasets
+    if data_type in ["SR Legacy", "Foundation"]:
+        score += 10
+
+    return score
+
+
+# ---------------- USDA SEARCH ---------------- #
 
 def search_food(food_name):
 
@@ -39,131 +64,83 @@ def search_food(food_name):
         "pageSize": 25
     }
 
-    try:
+    response = requests.get(url, params=params)
+    data = response.json()
 
-        response = requests.get(url, params=params)
-        data = response.json()
+    foods = data.get("foods", [])
 
-        if "foods" not in data:
-            return []
+    # rank results intelligently
+    ranked = sorted(
+        foods,
+        key=lambda x: score_food(x, food_name),
+        reverse=True
+    )
 
-        foods = data["foods"]
+    return ranked
 
-        # PRIORITIZE REAL / FOUNDATION FOODS
-        priority_foods = []
 
-        for food in foods:
+# ---------------- NUTRIENT FETCH ---------------- #
 
-            data_type = food.get("dataType", "")
+def get_nutrient(nutrients, name, unit=None):
 
-            if data_type in ["Foundation", "SR Legacy"]:
-                priority_foods.append(food)
+    for n in nutrients:
 
-        if priority_foods:
-            return priority_foods
-
-        return foods
-
-    except:
-        return []
-
-# ---------------------------------------------------
-# GET NUTRIENT
-# ---------------------------------------------------
-
-def get_nutrient(nutrients, nutrient_name, unit=None):
-
-    for nutrient in nutrients:
-
-        name = nutrient.get("nutrientName", "")
-        nutrient_unit = nutrient.get("unitName", "")
-        value = nutrient.get("value", 0)
-
-        if name == nutrient_name:
+        if n.get("nutrientName") == name:
 
             if unit:
-
-                if nutrient_unit == unit:
-                    return value
-
+                if n.get("unitName") == unit:
+                    return n.get("value", 0)
             else:
-                return value
+                return n.get("value", 0)
 
     return 0
 
-# ---------------------------------------------------
-# SCALE VALUES
-# ---------------------------------------------------
 
-def scale(value, grams):
+# ---------------- CONFIDENCE ---------------- #
 
-    return (value * grams) / 100
+def confidence(food, query):
 
-# ---------------------------------------------------
-# USER INPUT
-# ---------------------------------------------------
+    text = food.get("description", "").lower()
 
-food_query = st.text_input(
-    "🍗 Enter Food Name",
-    placeholder="Examples: chicken breast, banana, white rice, egg"
-)
+    score = 0
 
-grams = st.number_input(
-    "⚖️ Enter grams",
-    min_value=1,
-    value=100
-)
+    if query.lower() in text:
+        score += 60
 
-# ---------------------------------------------------
-# SEARCH RESULTS
-# ---------------------------------------------------
+    for w in query.lower().split():
+        if w in text:
+            score += 10
+
+    return min(score, 100)
+
+
+# ---------------- INPUT ---------------- #
+
+food_query = st.text_input("🍗 Enter Food Name")
+grams = st.number_input("⚖️ Enter grams", min_value=1, value=100)
+
+
+# ---------------- MAIN ---------------- #
 
 if food_query:
 
     foods = search_food(food_query)
 
-    # ---------------------------------------------------
-    # FOOD FOUND
-    # ---------------------------------------------------
-
     if foods:
 
-        food_options = {}
+        options = {}
 
-        for food in foods:
+        for f in foods:
 
-            description = food.get("description", "Unknown Food")
-            category = food.get("foodCategory", "")
-            data_type = food.get("dataType", "")
+            label = f"{f.get('description','Unknown')} | {f.get('foodCategory','')} | {f.get('dataType','')}"
+            options[label] = f
 
-            label = f"{description}"
+        selected_label = st.selectbox("✅ Select Best Match", list(options.keys()))
+        selected_food = options[selected_label]
 
-            if category:
-                label += f" | {category}"
-
-            if data_type:
-                label += f" | {data_type}"
-
-            food_options[label] = food
-
-        selected_food_label = st.selectbox(
-            "✅ Select Best Match",
-            list(food_options.keys())
-        )
-
-        selected_food = food_options[selected_food_label]
-
-        # ---------------------------------------------------
-        # BUTTON
-        # ---------------------------------------------------
-
-        if st.button("🔍 Get Complete Nutrition Facts"):
+        if st.button("🔍 Get Nutrition Facts"):
 
             nutrients = selected_food.get("foodNutrients", [])
-
-            # ---------------------------------------------------
-            # MACROS
-            # ---------------------------------------------------
 
             calories = get_nutrient(nutrients, "Energy", "KCAL")
             protein = get_nutrient(nutrients, "Protein")
@@ -172,81 +149,30 @@ if food_query:
             fiber = get_nutrient(nutrients, "Fiber, total dietary")
             sugar = get_nutrient(nutrients, "Sugars, total including NLEA")
 
-            saturated_fat = get_nutrient(
-                nutrients,
-                "Fatty acids, total saturated"
-            )
+            # scaling
+            def scale(x): return (x * grams) / 100
 
-            cholesterol = get_nutrient(
-                nutrients,
-                "Cholesterol"
-            )
+            calories = scale(calories)
+            protein = scale(protein)
+            carbs = scale(carbs)
+            fats = scale(fats)
+            fiber = scale(fiber)
+            sugar = scale(sugar)
 
-            sodium = get_nutrient(
-                nutrients,
-                "Sodium, Na"
-            )
-
-            potassium = get_nutrient(
-                nutrients,
-                "Potassium, K"
-            )
-
-            calcium = get_nutrient(
-                nutrients,
-                "Calcium, Ca"
-            )
-
-            iron = get_nutrient(
-                nutrients,
-                "Iron, Fe"
-            )
-
-            vitamin_c = get_nutrient(
-                nutrients,
-                "Vitamin C, total ascorbic acid"
-            )
-
-            vitamin_a = get_nutrient(
-                nutrients,
-                "Vitamin A, IU"
-            )
-
-            # ---------------------------------------------------
-            # SCALE ALL VALUES
-            # ---------------------------------------------------
-
-            calories = scale(calories, grams)
-            protein = scale(protein, grams)
-            carbs = scale(carbs, grams)
-            fats = scale(fats, grams)
-            fiber = scale(fiber, grams)
-            sugar = scale(sugar, grams)
-
-            saturated_fat = scale(saturated_fat, grams)
-            cholesterol = scale(cholesterol, grams)
-            sodium = scale(sodium, grams)
-            potassium = scale(potassium, grams)
-            calcium = scale(calcium, grams)
-            iron = scale(iron, grams)
-            vitamin_c = scale(vitamin_c, grams)
-            vitamin_a = scale(vitamin_a, grams)
-
-            # ---------------------------------------------------
-            # RESULTS
-            # ---------------------------------------------------
+            # confidence
+            conf = confidence(selected_food, food_query)
 
             st.markdown("---")
+            st.subheader(f"📊 Nutrition for {grams}g")
 
-            st.subheader(f"📊 Complete Nutrition Facts ({grams}g)")
+            st.success(selected_food["description"])
 
-            st.success(selected_food_label)
+            st.info(f"Match Confidence: {conf}%")
 
-            # ---------------------------------------------------
-            # MAIN METRICS
-            # ---------------------------------------------------
+            if conf < 60:
+                st.warning("⚠️ This may not be an exact match. Values are approximate.")
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
 
             with col1:
                 st.metric("🔥 Calories", f"{calories:.2f} kcal")
@@ -258,86 +184,19 @@ if food_query:
                 st.metric("🌾 Fiber", f"{fiber:.2f} g")
                 st.metric("🍬 Sugar", f"{sugar:.2f} g")
 
-            with col3:
-                st.metric("🧈 Saturated Fat", f"{saturated_fat:.2f} g")
-                st.metric("🩸 Cholesterol", f"{cholesterol:.2f} mg")
-                st.metric("🧂 Sodium", f"{sodium:.2f} mg")
-
-            # ---------------------------------------------------
-            # VITAMINS & MINERALS
-            # ---------------------------------------------------
-
             st.markdown("---")
-            st.subheader("🧬 Vitamins & Minerals")
 
-            col4, col5 = st.columns(2)
-
-            with col4:
-                st.metric("🍌 Potassium", f"{potassium:.2f} mg")
-                st.metric("🦴 Calcium", f"{calcium:.2f} mg")
-                st.metric("🩸 Iron", f"{iron:.2f} mg")
-
-            with col5:
-                st.metric("🍊 Vitamin C", f"{vitamin_c:.2f} mg")
-                st.metric("🥕 Vitamin A", f"{vitamin_a:.2f} IU")
-
-            # ---------------------------------------------------
-            # FULL TABLE
-            # ---------------------------------------------------
-
-            st.markdown("---")
-            st.subheader("📋 Full Nutrition Table")
-
-            nutrition_table = pd.DataFrame({
-
-                "Nutrient": [
-
-                    "Calories",
-                    "Protein",
-                    "Carbohydrates",
-                    "Fats",
-                    "Fiber",
-                    "Sugar",
-                    "Saturated Fat",
-                    "Cholesterol",
-                    "Sodium",
-                    "Potassium",
-                    "Calcium",
-                    "Iron",
-                    "Vitamin C",
-                    "Vitamin A"
-
-                ],
-
+            st.table(pd.DataFrame({
+                "Nutrient": ["Calories","Protein","Carbs","Fats","Fiber","Sugar"],
                 "Amount": [
-
-                    f"{calories:.2f} kcal",
-                    f"{protein:.2f} g",
-                    f"{carbs:.2f} g",
-                    f"{fats:.2f} g",
-                    f"{fiber:.2f} g",
-                    f"{sugar:.2f} g",
-                    f"{saturated_fat:.2f} g",
-                    f"{cholesterol:.2f} mg",
-                    f"{sodium:.2f} mg",
-                    f"{potassium:.2f} mg",
-                    f"{calcium:.2f} mg",
-                    f"{iron:.2f} mg",
-                    f"{vitamin_c:.2f} mg",
-                    f"{vitamin_a:.2f} IU"
-
+                    f"{calories:.2f}",
+                    f"{protein:.2f}",
+                    f"{carbs:.2f}",
+                    f"{fats:.2f}",
+                    f"{fiber:.2f}",
+                    f"{sugar:.2f}"
                 ]
-
-            })
-
-            st.table(nutrition_table)
-
-    # ---------------------------------------------------
-    # NO FOOD FOUND
-    # ---------------------------------------------------
+            }))
 
     else:
-
-        st.warning(
-            "⚠️ Exact USDA food not found. Try a more general food name."
-        )
+        st.error("No foods found. Try a simpler name.")
