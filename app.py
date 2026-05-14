@@ -9,62 +9,9 @@ st.set_page_config(
     layout="centered"
 )
 
-# ---------------- CUSTOM CSS ---------------- #
-st.markdown("""
-<style>
-
-.stApp {
-    background-color: #0E1117;
-    color: white;
-}
-
-h1, h2, h3 {
-    color: #00FFAA;
-    text-align: center;
-}
-
-.stTextInput > div > div > input {
-    background-color: #262730;
-    color: white;
-}
-
-.stNumberInput input {
-    background-color: #262730;
-    color: white;
-}
-
-.stSelectbox div[data-baseweb="select"] {
-    background-color: #262730;
-    color: white;
-}
-
-div.stButton > button {
-    background-color: #00FFAA;
-    color: black;
-    border-radius: 10px;
-    height: 3em;
-    width: 100%;
-    font-weight: bold;
-}
-
-div.stButton > button:hover {
-    background-color: #00cc88;
-    color: white;
-}
-
-.metric-container {
-    background-color: #1c1f26;
-    padding: 20px;
-    border-radius: 15px;
-    text-align: center;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
 # ---------------- TITLE ---------------- #
 st.title("🥗 AI Nutrition Tracker")
-st.write("Search foods from USDA database and get accurate nutrition facts.")
+st.write("Search any food and get accurate nutrition facts from USDA.")
 
 # ---------------- USDA API ---------------- #
 API_KEY = "P73wIVJPiCNTOFtegbe97NOAyX8cCif4fDzCwk07"
@@ -80,17 +27,25 @@ def search_food(food_name):
         "pageSize": 10
     }
 
-    response = requests.get(url, params=params)
+    try:
+        response = requests.get(url, params=params)
 
-    if response.status_code != 200:
+        # DEBUG
+        st.write("Status Code:", response.status_code)
+
+        data = response.json()
+
+        # DEBUG
+        st.write(data)
+
+        if "foods" in data:
+            return data["foods"]
+
         return []
 
-    data = response.json()
-
-    if "foods" in data:
-        return data["foods"]
-
-    return []
+    except Exception as e:
+        st.error(f"Error: {e}")
+        return []
 
 # ---------------- USER INPUT ---------------- #
 food_query = st.text_input("🍗 Search Food")
@@ -101,7 +56,7 @@ grams = st.number_input(
     value=100
 )
 
-# ---------------- SEARCH RESULTS ---------------- #
+# ---------------- FOOD SEARCH ---------------- #
 if food_query:
 
     foods = search_food(food_query)
@@ -116,27 +71,27 @@ if food_query:
 
             brand = food.get("brandOwner", "")
 
-            food_category = food.get("foodCategory", "")
+            category = food.get("foodCategory", "")
 
             label = description
 
             if brand:
                 label += f" | {brand}"
 
-            if food_category:
-                label += f" | {food_category}"
+            if category:
+                label += f" | {category}"
 
             food_options[label] = food
 
-        selected_label = st.selectbox(
-            "✅ Select Exact Food Item",
+        selected_food_label = st.selectbox(
+            "✅ Select Exact Food",
             list(food_options.keys())
         )
 
-        selected_food = food_options[selected_label]
+        selected_food = food_options[selected_food_label]
 
         # ---------------- BUTTON ---------------- #
-        if st.button("🔍 Get Accurate Nutrition"):
+        if st.button("🔍 Get Nutrition Facts"):
 
             nutrients = selected_food.get("foodNutrients", [])
 
@@ -152,40 +107,39 @@ if food_query:
                 name = nutrient.get("nutrientName", "")
                 value = nutrient.get("value", 0)
 
-                adjusted_value = (value * grams) / 100
+                adjusted = (value * grams) / 100
+
+                # Calories
+                if name == "Energy":
+                    calories = adjusted
 
                 # Protein
-                if name == "Protein":
-                    protein = adjusted_value
+                elif name == "Protein":
+                    protein = adjusted
 
                 # Carbs
                 elif name == "Carbohydrate, by difference":
-                    carbs = adjusted_value
+                    carbs = adjusted
 
                 # Fat
                 elif name == "Total lipid (fat)":
-                    fats = adjusted_value
-
-                # Calories
-                elif name == "Energy":
-                    calories = adjusted_value
+                    fats = adjusted
 
                 # Fiber
                 elif name == "Fiber, total dietary":
-                    fiber = adjusted_value
+                    fiber = adjusted
 
                 # Sugar
                 elif name == "Sugars, total including NLEA":
-                    sugar = adjusted_value
+                    sugar = adjusted
 
             # ---------------- RESULTS ---------------- #
             st.markdown("---")
 
             st.subheader(f"📊 Nutrition Facts for {grams}g")
 
-            st.success(selected_label)
+            st.success(selected_food_label)
 
-            # Metrics
             col1, col2 = st.columns(2)
 
             with col1:
@@ -198,14 +152,12 @@ if food_query:
                 st.metric("🌾 Fiber", f"{fiber:.2f} g")
                 st.metric("🍬 Sugar", f"{sugar:.2f} g")
 
-            # ---------------- MACRO TABLE ---------------- #
-            st.markdown("---")
-
-            nutrition_data = {
+            # ---------------- TABLE ---------------- #
+            nutrition_table = pd.DataFrame({
                 "Nutrient": [
                     "Calories",
                     "Protein",
-                    "Carbohydrates",
+                    "Carbs",
                     "Fats",
                     "Fiber",
                     "Sugar"
@@ -218,11 +170,9 @@ if food_query:
                     f"{fiber:.2f} g",
                     f"{sugar:.2f} g"
                 ]
-            }
+            })
 
-            df = pd.DataFrame(nutrition_data)
-
-            st.table(df)
+            st.table(nutrition_table)
 
     else:
-        st.error("❌ No foods found. Try another search.")
+        st.error("❌ No foods found.")
