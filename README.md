@@ -1,4 +1,4 @@
-# 🥗 Nutrition Tracker System
+# Nutrition Tracker System
 
 ## Overview
 
