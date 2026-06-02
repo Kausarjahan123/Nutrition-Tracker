@@ -1,5 +1,11 @@
 # Nutrition Tracker System
 
+Live Demo
+Try the live application here:
+https://nutrition-tracker-lhtduhmammvysfqqbk9ysj.streamlit.app/
+
+The app is fully deployed using Streamlit Cloud and works in real time.
+
 ## Overview
 
 The Nutrition Tracker is a data-driven application that helps users analyze nutritional values of food items based on macronutrients such as protein, carbohydrates, and fats. It provides insights into healthy eating patterns and supports basic nutrition-based decision making.
