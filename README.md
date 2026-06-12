@@ -128,11 +128,13 @@ streamlit run app.py
 
 ### Home Page
 
-(Add screenshot here)
+<img width="1926" height="948" alt="Screenshot (173)" src="https://github.com/user-attachments/assets/c4c20bf0-9c0e-4745-968b-8df7bb984bcb" />
+
 
 ### Nutrition Analysis Output
 
-(Add screenshot here)
+<img width="1915" height="949" alt="Screenshot (174)" src="https://github.com/user-attachments/assets/5c05ad13-7358-44af-820f-931a3a009dcc" />
+
 
 ---
 
